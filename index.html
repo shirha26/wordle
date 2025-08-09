@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wordle</title>
+    <link href="https://fonts.googleapis.com/css2?family=Alef:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Alef', 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-color, #ffffff);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: var(--text-color, #000000);
+            transition: all 0.3s ease;
+        }
+
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --border-color: #000000;
+            --button-bg: #000000;
+            --button-text: #ffffff;
+            --button-hover-bg: #ffffff;
+            --button-hover-text: #000000;
+            --inactive-color: #cccccc;
+        }
+
+        body.negative {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --border-color: #ffffff;
+            --button-bg: #ffffff;
+            --button-text: #000000;
+            --button-hover-bg: #000000;
+            --button-hover-text: #ffffff;
+            --inactive-color: #333333;
+        }
+
+        .container {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 60px 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-color);
+            text-shadow: none;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            margin-bottom: 50px;
+            color: var(--text-color);
+            font-weight: 400;
+        }
+
+        .negative-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            font-size: 0.9em;
+            cursor: pointer;
+            font-family: inherit;
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .negative-toggle:hover {
+            background: var(--button-hover-bg);
+            color: var(--button-hover-text);
+        }
+
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .game-option {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-option:hover {
+            background: var(--button-bg);
+            color: var(--button-text);
+            transform: translateY(-2px);
+        }
+
+        .game-option:active {
+            transform: translateY(0);
+        }
+
+        .game-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .game-description {
+            font-size: 1em;
+            line-height: 1.4;
+            opacity: 0.8;
+        }
+
+        .icon {
+            font-size: 2em;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 40px 20px;
+                max-width: 100%;
+            }
+            
+            h1 {
+                font-size: 2.2em;
+                margin-bottom: 15px;
+                margin-top: 20px;
+            }
+
+            .subtitle {
+                font-size: 1em;
+                margin-bottom: 40px;
+            }
+
+            .negative-toggle {
+                top: 10px;
+                left: 10px;
+                padding: 8px 12px;
+                font-size: 0.8em;
+            }
+
+            .game-option {
+                padding: 25px 20px;
+            }
+
+            .game-title {
+                font-size: 1.3em;
+            }
+
+            .game-description {
+                font-size: 0.9em;
+            }
+
+            .icon {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+                display: none;
+            }
+
+            .button-container {
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .container {
+                padding: 30px 15px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+                margin-bottom: 12px;
+            }
+
+            .subtitle {
+                font-size: 0.9em;
+                margin-bottom: 30px;
+            }
+
+            .negative-toggle {
+                padding: 6px 10px;
+                font-size: 0.7em;
+            }
+
+            .game-option {
+                padding: 20px 15px;
+            }
+
+            .game-title {
+                font-size: 1.2em;
+            }
+
+            .game-description {
+                font-size: 0.85em;
+            }
+        }
+
+        /* Animation effects */
+        .game-option {
+            animation: fadeInUp 0.6s ease forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .game-option:nth-child(1) {
+            animation-delay: 0.1s;
+        }
+
+        .game-option:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .container {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="negative-toggle" onclick="toggleNegative()">נגטיב</button>
+    
+    <div class="container">
+        <h1>Wordle</h1>
+        
+        <div class="button-container">
+            <div class="game-option" onclick="goToSinglePlayer()">
+                <div class="game-title">משחק יחיד</div>
+                <div class="game-description">נחש מילה שנבחרה עבורך באקראי מבנק המילים</div>
+            </div>
+            
+            <div class="game-option" onclick="goToMultiplayer()">
+                <div class="game-title">משחק עם חבר</div>
+                <div class="game-description">צור משחק או הצטרף למשחק קיים עם חבר</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load negative mode preference from localStorage
+        function loadNegativeMode() {
+            const isNegative = localStorage.getItem('wordle-negative-mode') === 'true';
+            if (isNegative) {
+                document.body.classList.add('negative');
+            }
+        }
+
+        function toggleNegative() {
+            const isNegative = document.body.classList.toggle('negative');
+            // Save preference to localStorage
+            localStorage.setItem('wordle-negative-mode', isNegative.toString());
+        }
+
+        function goToSinglePlayer() {
+            // Pass negative mode state to single player game
+            const isNegative = document.body.classList.contains('negative');
+            const url = `wordle_single_player.html${isNegative ? '?negative=true' : ''}`;
+            window.location.href = url;
+        }
+
+        function goToMultiplayer() {
+            // Pass negative mode state to multiplayer game
+            const isNegative = document.body.classList.contains('negative');
+            const url = `wordle_multiplayer.html${isNegative ? '?negative=true' : ''}`;
+            window.location.href = url;
+        }
+
+        // Initialize negative mode on page load
+        document.addEventListener('DOMContentLoaded', loadNegativeMode);
+    </script>
+</body>
+</html>
