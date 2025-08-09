@@ -716,14 +716,32 @@
             const backspaceKey = document.createElement('button');
             backspaceKey.className = 'key';
             backspaceKey.textContent = '←';
-            backspaceKey.onclick = () => {
+            const handleBackspace = () => {
                 if (gameEnded || isHost) return;
                 const input = document.getElementById('guess-input');
                 input.value = input.value.slice(0, -1);
                 currentGuess = input.value;
                 input.focus();
             };
+
+            backspaceKey.onclick = handleBackspace;
+            backspaceKey.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                handleBackspace();
+            }, { passive: false });
             keyboard.appendChild(backspaceKey);
+
+            const handleEnter = () => {
+                if (!gameEnded && !isHost) {
+                    submitGuess();
+                }
+            };
+
+            enterKey.onclick = handleEnter;
+            enterKey.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                handleEnter();
+            }, { passive: false });
     
             // Add Hebrew letters
             hebrewLetters.forEach(letter => {
@@ -732,10 +750,14 @@
                 key.textContent = letter;
                 key.onclick = () => addLetter(letter);
         
-                // Prevent mobile keyboard from closing
                 key.addEventListener('touchstart', function(e) {
                     e.preventDefault();
-                });
+                    addLetter(letter);
+                }, { passive: false });
+
+                key.addEventListener('touchend', function(e) {
+                    e.preventDefault();
+                    }, { passive: false });
         
                 keyboard.appendChild(key);
             });
