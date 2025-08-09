@@ -771,6 +771,7 @@
         }
 
         function submitGuess() {
+            console.log('submitGuess called on mobile');
             if (isHost || gameEnded) return;
             
             const guess = document.getElementById('guess-input').value.trim();
@@ -963,7 +964,6 @@
             if (e.key === 'Enter') {
             e.preventDefault();
             submitGuess();
-            return;
         }
         return;
     }
@@ -1016,6 +1016,11 @@
             if (cleanValue !== e.target.value) {
                 e.target.value = cleanValue;
                 currentGuess = cleanValue;
+            }
+            if (e.target.value.length === 5) {
+                setTimeout(() => {
+                    submitGuess();
+                }, 100);
             }
         });
     </script>
