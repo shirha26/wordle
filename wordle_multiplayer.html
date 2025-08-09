@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wordle - Multiplayer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+    <script src="wordleBankWords.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Alef:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -128,6 +129,17 @@
             color: var(--button-hover-text);
         }
 
+        .button.secondary {
+            background: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .button.secondary:hover {
+            background: var(--button-bg);
+            color: var(--button-text);
+        }
+
         .input-field {
             padding: 15px;
             border: 1px solid var(--border-color);
@@ -142,6 +154,37 @@
         .input-field:focus {
             outline: none;
             border: 2px solid var(--border-color);
+        }
+
+        .word-options {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .random-word {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 12px 20px;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            border-radius: 0;
+        }
+
+        .random-word:hover {
+            background: var(--button-bg);
+            color: var(--button-text);
+        }
+
+        .random-word.selected {
+            background: var(--button-bg);
+            color: var(--button-text);
         }
 
         .token-container {
@@ -399,6 +442,16 @@
                 padding: 15px;
                 margin: 15px 0;
             }
+
+            .word-options {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .random-word {
+                padding: 10px 15px;
+                font-size: 1em;
+            }
         }
 
         @media (max-width: 400px) {
@@ -446,6 +499,11 @@
             .token-text {
                 font-size: 0.9em;
             }
+
+            .random-word {
+                padding: 8px 12px;
+                font-size: 0.9em;
+            }
         }
     </style>
 </head>
@@ -465,9 +523,15 @@
 
         <!-- Host Game -->
         <div id="host-game" class="game-section">
-            <div class="status">הכנס מילה בת 5 אותיות עבור השחקן השני:</div>
-            <input type="text" id="word-input" class="input-field" placeholder="הכנס מילה..." maxlength="5" 
-                   pattern="[א-ת]{5}" oninput="this.value = this.value.replace(/[^א-ת]/g, '')">
+            <div class="status">בחר או הכנס מילה בת 5 אותיות עבור השחקן השני:</div>
+            
+            <!-- Random word suggestions -->
+            <div class="status" style="font-size: 0.9em; margin: 15px 0 10px 0; opacity: 0.8;">או בחר מהצעות מבנק המילים:</div>
+            <div class="word-options" id="word-suggestions"></div>
+            <button class="button secondary" onclick="generateNewSuggestions()">הצעות חדשות</button>
+            
+            <input type="text" id="word-input" class="input-field" placeholder="או הכנס מילה בעצמך..." maxlength="5" 
+                   pattern="[א-ת]{5}" oninput="this.value = this.value.replace(/[^א-ת]/g, ''); clearSelectedWord()">
             <br>
             <button class="button" onclick="startHosting()">התחל משחק</button>
             <button class="button" onclick="showMainMenu()">חזור</button>
@@ -507,6 +571,7 @@
         const maxGuesses = 6;
         let gameEnded = false;
         let keyboardLetters = new Set();
+        let selectedRandomWord = '';
 
         // Hebrew keyboard layout
         const hebrewLetters = [
@@ -525,6 +590,9 @@
             
             // Load negative mode preference
             loadNegativeMode();
+            
+            // Generate initial word suggestions
+            generateNewSuggestions();
         }
 
         function loadNegativeMode() {
@@ -543,6 +611,47 @@
             const isNegative = document.body.classList.contains('negative');
             const url = `index.html${isNegative ? '?negative=true' : ''}`;
             window.location.href = url;
+        }
+
+        function generateNewSuggestions() {
+            const suggestionsContainer = document.getElementById('word-suggestions');
+            suggestionsContainer.innerHTML = '';
+            
+            // Generate 3 random words
+            const suggestions = [];
+            while (suggestions.length < 3) {
+                const randomWord = getRandomWord();
+                if (!suggestions.includes(randomWord)) {
+                    suggestions.push(randomWord);
+                }
+            }
+            
+            suggestions.forEach(word => {
+                const wordElement = document.createElement('button');
+                wordElement.className = 'random-word';
+                wordElement.textContent = word;
+                wordElement.onclick = () => selectRandomWord(word, wordElement);
+                suggestionsContainer.appendChild(wordElement);
+            });
+        }
+
+        function selectRandomWord(word, element) {
+            // Clear previous selection
+            document.querySelectorAll('.random-word').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            // Select new word
+            element.classList.add('selected');
+            selectedRandomWord = word;
+            document.getElementById('word-input').value = '';
+        }
+
+        function clearSelectedWord() {
+            document.querySelectorAll('.random-word').forEach(el => {
+                el.classList.remove('selected');
+            });
+            selectedRandomWord = '';
         }
 
         function copyToClipboard(text) {
@@ -606,6 +715,7 @@
         function showHostGame() {
             hideAllSections();
             document.getElementById('host-game').classList.add('active');
+            generateNewSuggestions();
         }
 
         function showJoinGame() {
@@ -620,9 +730,17 @@
         }
 
         function startHosting() {
-            const wordInput = document.getElementById('word-input').value.trim();
+            let wordInput = '';
+            
+            // Check if a random word is selected or manual input is provided
+            if (selectedRandomWord) {
+                wordInput = selectedRandomWord;
+            } else {
+                wordInput = document.getElementById('word-input').value.trim();
+            }
+            
             if (wordInput.length !== 5) {
-                showStatus('host-status', 'אנא הכנס מילה בת 5 אותיות בדיוק', 'error');
+                showStatus('host-status', 'אנא בחר מילה מההצעות או הכנס מילה בת 5 אותיות בדיוק', 'error');
                 return;
             }
 
@@ -690,4 +808,405 @@
                     if (data.type === 'result') {
                         displayGuessResult(data.guess, data.result);
                     } else if (data.type === 'game-over') {
-                        endGame(data.won, data.wor
+                        endGame(data.won, data.word);
+                    } else if (data.type === 'new-game') {
+                        resetGame();
+                    }
+                });
+
+                connection.on('close', function() {
+                    showStatus('game-status', 'המארח התנתק', 'error');
+                });
+            });
+
+            peer.on('error', function(err) {
+                showStatus('join-status', `שגיאה בחיבור: ${err.message}`, 'error');
+            });
+        }
+
+        function startGame() {
+            hideAllSections();
+            document.getElementById('game-play').classList.add('active');
+            
+            resetGame();
+            createKeyboard();
+            
+            if (isHost) {
+                document.getElementById('game-status').textContent = 'השחקן השני מנחש...';
+            } else {
+                document.getElementById('game-status').textContent = 'נחש את המילה!';
+                document.getElementById('guess-input').style.display = 'block';
+                document.getElementById('submit-guess').style.display = 'inline-block';
+                document.getElementById('guess-input').focus();
+            }
+        }
+
+        function resetGame() {
+            guessCount = 0;
+            gameEnded = false;
+            keyboardLetters.clear();
+            currentGuess = '';
+            
+            // Clear the grid
+            const grid = document.getElementById('word-grid');
+            grid.innerHTML = '';
+            
+            // Create 6 rows of 5 boxes each
+            for (let i = 0; i < maxGuesses; i++) {
+                const row = document.createElement('div');
+                row.className = 'word-row';
+                for (let j = 0; j < 5; j++) {
+                    const box = document.createElement('div');
+                    box.className = 'letter-box';
+                    row.appendChild(box);
+                }
+                grid.appendChild(row);
+            }
+
+            // Reset keyboard
+            createKeyboard();
+            
+            // Show/hide UI elements based on role
+            if (!isHost) {
+                document.getElementById('guess-input').style.display = 'block';
+                document.getElementById('submit-guess').style.display = 'inline-block';
+                document.getElementById('guess-input').value = '';
+                document.getElementById('guess-input').focus();
+            }
+            
+            document.getElementById('new-game-btn').style.display = 'none';
+        }
+
+        function createKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            keyboard.innerHTML = '';
+    
+            // Add backspace key
+            const backspaceKey = document.createElement('button');
+            backspaceKey.className = 'key';
+            backspaceKey.textContent = '←';
+            const handleBackspace = () => {
+                if (gameEnded || isHost) return;
+                const input = document.getElementById('guess-input');
+                input.value = input.value.slice(0, -1);
+                currentGuess = input.value;
+                input.focus();
+            };
+
+            backspaceKey.onclick = handleBackspace;
+            backspaceKey.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                handleBackspace();
+            }, { passive: false });
+            keyboard.appendChild(backspaceKey);
+    
+            // Add Hebrew letters
+            hebrewLetters.forEach(letter => {
+                const key = document.createElement('button');
+                key.className = 'key';
+                key.textContent = letter;
+                key.onclick = () => addLetter(letter);
+        
+                key.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    addLetter(letter);
+                }, { passive: false });
+
+                key.addEventListener('touchend', function(e) {
+                    e.preventDefault();
+                }, { passive: false });
+        
+                keyboard.appendChild(key);
+            });
+    
+            // Add enter key
+            const enterKey = document.createElement('button');
+            enterKey.className = 'key';
+            enterKey.textContent = '↵';
+            enterKey.style.gridColumn = 'span 2';
+            const handleEnter = () => {
+                if (!gameEnded && !isHost) {
+                    submitGuess();
+                }
+            };
+
+            enterKey.onclick = handleEnter;
+            enterKey.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                handleEnter();
+            }, { passive: false });
+            keyboard.appendChild(enterKey);
+        }
+
+        function addLetter(letter) {
+            if (gameEnded || isHost) return;
+    
+            const input = document.getElementById('guess-input');
+            if (input.value.length < 5) {
+                input.value += letter;
+                currentGuess = input.value;
+        
+                input.focus();
+        
+                // Auto-submit if 5 letters
+                if (input.value.length === 5) {
+                    setTimeout(submitGuess, 100);
+                }
+            }
+        }
+
+        function submitGuess() {
+            if (isHost || gameEnded) return;
+            
+            const guess = document.getElementById('guess-input').value.trim();
+            if (guess.length !== 5) {
+                showStatus('game-status', 'אנא הכנס מילה בת 5 אותיות', 'error');
+                return;
+            }
+
+            if (!/^[א-ת]+$/.test(guess)) {
+                showStatus('game-status', 'אנא השתמש רק באותיות עבריות', 'error');
+                return;
+            }
+
+            // Send guess to host
+            connection.send({
+                type: 'guess',
+                guess: guess
+            });
+
+            document.getElementById('guess-input').value = '';
+            currentGuess = '';
+        }
+
+        function handleGuess(guess) {
+            if (!isHost) return;
+
+            const result = checkGuess(guess, targetWord);
+            
+            // Send result back to guesser
+            connection.send({
+                type: 'result',
+                guess: guess,
+                result: result
+            });
+
+            // Display result for host
+            displayGuessResult(guess, result);
+
+            // Check win/lose conditions
+            if (guess === targetWord) {
+                connection.send({
+                    type: 'game-over',
+                    won: true,
+                    word: targetWord
+                });
+                endGame(true, targetWord);
+            } else if (guessCount >= maxGuesses) {
+                connection.send({
+                    type: 'game-over',
+                    won: false,
+                    word: targetWord
+                });
+                endGame(false, targetWord);
+            }
+        }
+
+        function checkGuess(guess, target) {
+            const result = [];
+            const targetArray = target.split('');
+            const guessArray = guess.split('');
+            
+            // First pass - exact matches
+            for (let i = 0; i < 5; i++) {
+                if (guessArray[i] === targetArray[i]) {
+                    result[i] = 'correct';
+                    targetArray[i] = null; // Mark as used
+                    guessArray[i] = null; // Mark as used
+                }
+            }
+            
+            // Second pass - partial matches
+            for (let i = 0; i < 5; i++) {
+                if (guessArray[i] !== null) {
+                    const index = targetArray.indexOf(guessArray[i]);
+                    if (index !== -1) {
+                        result[i] = 'partial';
+                        targetArray[index] = null; // Mark as used
+                    } else {
+                        result[i] = 'incorrect';
+                    }
+                }
+            }
+            
+            return result;
+        }
+
+        function displayGuessResult(guess, result) {
+            const rows = document.querySelectorAll('.word-row');
+            const currentRow = rows[guessCount];
+            const boxes = currentRow.querySelectorAll('.letter-box');
+            
+            for (let i = 0; i < 5; i++) {
+                boxes[i].textContent = guess[i];
+                boxes[i].className = `letter-box ${result[i]}`;
+                
+                // Update keyboard
+                updateKeyboard(guess[i], result[i]);
+            }
+            
+            guessCount++;
+        }
+
+        function updateKeyboard(letter, result) {
+            const keys = document.querySelectorAll('.key');
+            keys.forEach(key => {
+                if (key.textContent === letter) {
+                    // Only update if it's a better result
+                    if (!key.classList.contains('correct')) {
+                        if (result === 'correct' || (result === 'partial' && !key.classList.contains('partial'))) {
+                            key.className = `key ${result}`;
+                        } else if (result === 'incorrect' && !key.classList.contains('partial')) {
+                            key.className = `key ${result}`;
+                        }
+                    }
+                }
+            });
+        }
+
+        function endGame(won, word) {
+            gameEnded = true;
+            
+            if (!isHost) {
+                document.getElementById('guess-input').style.display = 'none';
+                document.getElementById('submit-guess').style.display = 'none';
+            }
+            
+            const status = document.getElementById('game-status');
+            if (won) {
+                if (isHost) {
+                    status.innerHTML = `השחקן השני ניצח! המילה הייתה: <strong>${word}</strong>`;
+                } else {
+                    status.innerHTML = `כל הכבוד! ניחשת נכון! המילה הייתה: <strong>${word}</strong>`;
+                }
+                status.className = 'status success';
+            } else {
+                status.innerHTML = `המשחק נגמר. המילה הייתה: <strong>${word}</strong>`;
+                status.className = 'status error';
+            }
+            
+            document.getElementById('new-game-btn').style.display = 'inline-block';
+        }
+
+        function newGame() {
+            if (isHost) {
+                // Ask for new word
+                hideAllSections();
+                document.getElementById('host-game').classList.add('active');
+                document.getElementById('word-input').value = '';
+                document.getElementById('host-status').innerHTML = '';
+                selectedRandomWord = '';
+                generateNewSuggestions();
+                
+                // Notify the other player
+                if (connection) {
+                    connection.send({ type: 'new-game' });
+                }
+            } else {
+                // Wait for host to set new word
+                showStatus('game-status', 'מחכה למארח להגדיר מילה חדשה...', 'connection-info');
+            }
+        }
+
+        function showTokenDisplay(gameId) {
+            const statusDiv = document.getElementById('host-status');
+            statusDiv.innerHTML = `
+                <div class="connection-info">
+                    <div style="margin-bottom: 15px; font-weight: 600;">קוד המשחק שלך:</div>
+                    <div class="token-container">
+                        <div class="token-text">${gameId}</div>
+                        <button class="copy-button" onclick="copyToClipboard('${gameId}')">העתק</button>
+                    </div>
+                    <div style="margin-top: 15px;">מחכה לשחקן שני...</div>
+                </div>
+            `;
+        }
+
+        function showStatus(elementId, message, type, append = false) {
+            const element = document.getElementById(elementId);
+            const content = `<div class="${type}">${message}</div>`;
+            
+            if (append) {
+                element.innerHTML += content;
+            } else {
+                element.innerHTML = content;
+            }
+        }
+
+        // Add keyboard support
+        document.addEventListener('keydown', function(e) {
+            if (gameEnded || isHost) return;
+            if (e.target.tagName === 'INPUT') {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitGuess();
+                }
+                return;
+            }
+    
+            // Allow Ctrl+V 
+            if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+                return; 
+            }
+    
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitGuess();
+            } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                e.preventDefault();
+                const input = document.getElementById('guess-input');
+                if (e.key === 'Backspace') {
+                    input.value = input.value.slice(0, -1);
+                } else if (e.key === 'Delete') {
+                    input.value = input.value.slice(1);
+                }
+                currentGuess = input.value;
+            } else if (/^[א-ת]$/.test(e.key)) {
+                e.preventDefault();
+                addLetter(e.key);
+            }
+        });
+
+        // Handle paste events
+        document.getElementById('guess-input').addEventListener('paste', function(e) {
+            e.preventDefault(); 
+            
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const cleanText = pastedText.replace(/[^א-ת]/g, '').substring(0, 5);
+            
+            this.value = cleanText;
+            currentGuess = cleanText;
+        });
+
+        // Auto-submit when 5 letters are entered
+        document.getElementById('guess-input').addEventListener('input', function(e) {
+            currentGuess = e.target.value;
+    
+            // Clean input - only Hebrew letters
+            const cleanValue = e.target.value.replace(/[^א-ת]/g, '').substring(0, 5);
+            if (cleanValue !== e.target.value) {
+                e.target.value = cleanValue;
+                currentGuess = cleanValue;
+            }
+            if (e.target.value.length === 5) {
+                setTimeout(() => {
+                    submitGuess();
+                }, 100);
+            }
+        });
+
+        // Initialize game when page loads
+        document.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
