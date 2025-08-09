@@ -246,6 +246,7 @@
             gap: 5px;
             max-width: 500px;
             margin: 20px auto;
+            user-select: none;
         }
 
         .key {
@@ -257,6 +258,8 @@
             transition: all 0.1s ease;
             font-family: inherit;
             color: var(--text-color);
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .key:hover {
@@ -708,23 +711,62 @@
         function createKeyboard() {
             const keyboard = document.getElementById('keyboard');
             keyboard.innerHTML = '';
-            
+    
+            // Add backspace key
+            const backspaceKey = document.createElement('button');
+            backspaceKey.className = 'key';
+            backspaceKey.textContent = '←';
+            backspaceKey.onclick = () => {
+                if (gameEnded || isHost) return;
+                const input = document.getElementById('guess-input');
+                input.value = input.value.slice(0, -1);
+                currentGuess = input.value;
+                input.focus();
+            };
+            keyboard.appendChild(backspaceKey);
+    
+            // Add Hebrew letters
             hebrewLetters.forEach(letter => {
                 const key = document.createElement('button');
                 key.className = 'key';
                 key.textContent = letter;
                 key.onclick = () => addLetter(letter);
+        
+                // Prevent mobile keyboard from closing
+                key.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                });
+        
                 keyboard.appendChild(key);
             });
+    
+            // Add enter key
+            const enterKey = document.createElement('button');
+            enterKey.className = 'key';
+            enterKey.textContent = '↵';
+            enterKey.style.gridColumn = 'span 2';
+            enterKey.onclick = () => {
+                if (!gameEnded && !isHost) {
+                    submitGuess();
+                }
+            };
+            keyboard.appendChild(enterKey);
         }
 
         function addLetter(letter) {
             if (gameEnded || isHost) return;
-            
+    
             const input = document.getElementById('guess-input');
             if (input.value.length < 5) {
                 input.value += letter;
                 currentGuess = input.value;
+        
+                input.focus();
+        
+                // Auto-submit if 5 letters
+                if (input.value.length === 5) {
+                    setTimeout(submitGuess, 100);
+                }
             }
         }
 
@@ -917,29 +959,37 @@
         // Add keyboard support
         document.addEventListener('keydown', function(e) {
             if (gameEnded || isHost) return;
-            
-            // Allow Ctrl+V 
-            if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
-                return; 
-            }
-            
+            if (e.target.tagName === 'INPUT') {
             if (e.key === 'Enter') {
-                e.preventDefault(); 
-                submitGuess();
-            } else if (e.key === 'Backspace' || e.key === 'Delete') {
-                e.preventDefault(); 
-                const input = document.getElementById('guess-input');
-                if (e.key === 'Backspace') {
-                    input.value = input.value.slice(0, -1); 
-                } else if (e.key === 'Delete') {
-                    input.value = input.value.slice(1); 
-                }
-                currentGuess = input.value;
-            } else if (/^[א-ת]$/.test(e.key)) {
-                e.preventDefault(); 
-                addLetter(e.key);
-            }
-        });
+            e.preventDefault();
+            submitGuess();
+            return;
+        }
+        return;
+    }
+    
+    // Allow Ctrl+V 
+    if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+        return; 
+    }
+    
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        submitGuess();
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        const input = document.getElementById('guess-input');
+        if (e.key === 'Backspace') {
+            input.value = input.value.slice(0, -1);
+        } else if (e.key === 'Delete') {
+            input.value = input.value.slice(1);
+        }
+        currentGuess = input.value;
+    } else if (/^[א-ת]$/.test(e.key)) {
+        e.preventDefault();
+        addLetter(e.key);
+    }
+});
 
         // HandlePasteEvents
         document.getElementById('guess-input').addEventListener('paste', function(e) {
@@ -958,8 +1008,14 @@
 
         // Auto-submit when 5 letters are entered
         document.getElementById('guess-input').addEventListener('input', function(e) {
-            if (e.target.value.length === 5) {
-                setTimeout(submitGuess, 100);
+            // Update current guess but don't auto-submit to avoid conflicts
+            currentGuess = e.target.value;
+    
+            // Clean input - only Hebrew letters
+            const cleanValue = e.target.value.replace(/[^א-ת]/g, '').substring(0, 5);
+            if (cleanValue !== e.target.value) {
+                e.target.value = cleanValue;
+                currentGuess = cleanValue;
             }
         });
     </script>
