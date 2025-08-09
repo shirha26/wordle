@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wordle</title>
+    <title>Wordle - Multiplayer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Alef:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -78,6 +78,26 @@
         }
 
         .negative-toggle:hover {
+            background: var(--button-hover-bg);
+            color: var(--button-hover-text);
+        }
+
+        .back-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            font-size: 0.9em;
+            cursor: pointer;
+            font-family: inherit;
+            z-index: 10;
+            text-decoration: none;
+        }
+
+        .back-button:hover {
             background: var(--button-hover-bg);
             color: var(--button-hover-text);
         }
@@ -300,11 +320,18 @@
                 margin-top: 15px;
             }
 
-            .negative-toggle {
+            .negative-toggle, .back-button {
                 top: 10px;
-                left: 10px;
                 padding: 8px 12px;
                 font-size: 0.8em;
+            }
+
+            .negative-toggle {
+                left: 10px;
+            }
+
+            .back-button {
+                right: 10px;
             }
             
             .letter-box {
@@ -411,7 +438,7 @@
                 margin: 5px 2px;
             }
 
-            .negative-toggle {
+            .negative-toggle, .back-button {
                 padding: 6px 10px;
                 font-size: 0.7em;
             }
@@ -424,8 +451,10 @@
 </head>
 <body>
     <button class="negative-toggle" onclick="toggleNegative()">נגטיב</button>
+    <a href="#" class="back-button" onclick="goBack()">◄ חזור</a>
+    
     <div class="container">
-        <h1>Wordle</h1>
+        <h1>Wordle - Multiplayer</h1>
 
         <!-- Main Menu -->
         <div id="main-menu" class="game-section active">
@@ -486,8 +515,34 @@
             'ר', 'ש', 'ת', 'ך', 'ם', 'ף', 'ץ'
         ];
 
+        function initGame() {
+            // Check URL parameters for negative mode
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('negative') === 'true') {
+                document.body.classList.add('negative');
+                localStorage.setItem('wordle-negative-mode', 'true');
+            }
+            
+            // Load negative mode preference
+            loadNegativeMode();
+        }
+
+        function loadNegativeMode() {
+            const isNegative = localStorage.getItem('wordle-negative-mode') === 'true';
+            if (isNegative) {
+                document.body.classList.add('negative');
+            }
+        }
+
         function toggleNegative() {
-            document.body.classList.toggle('negative');
+            const isNegative = document.body.classList.toggle('negative');
+            localStorage.setItem('wordle-negative-mode', isNegative.toString());
+        }
+
+        function goBack() {
+            const isNegative = document.body.classList.contains('negative');
+            const url = `index.html${isNegative ? '?negative=true' : ''}`;
+            window.location.href = url;
         }
 
         function copyToClipboard(text) {
@@ -495,7 +550,6 @@
             const originalText = button.textContent;
             
             navigator.clipboard.writeText(text).then(() => {
-                // Visual feedback for successful copy
                 button.textContent = '✓ הועתק!';
                 button.style.background = 'var(--button-bg)';
                 button.style.color = 'var(--button-text)';
@@ -506,7 +560,6 @@
                     button.style.color = '';
                 }, 2000);
             }).catch(() => {
-                // Fallback for older browsers
                 const textArea = document.createElement('textarea');
                 textArea.value = text;
                 textArea.style.position = 'fixed';
@@ -518,12 +571,10 @@
                 
                 try {
                     document.execCommand('copy');
-                    // Visual feedback for successful fallback copy
                     button.textContent = '✓ הועתק!';
                     button.style.background = 'var(--button-bg)';
                     button.style.color = 'var(--button-text)';
                 } catch (err) {
-                    // Visual feedback for failed copy
                     button.textContent = '✗ שגיאה';
                     button.style.background = 'var(--bg-color)';
                     button.style.color = 'var(--text-color)';
@@ -639,412 +690,4 @@
                     if (data.type === 'result') {
                         displayGuessResult(data.guess, data.result);
                     } else if (data.type === 'game-over') {
-                        endGame(data.won, data.word);
-                    } else if (data.type === 'new-game') {
-                        resetGame();
-                    }
-                });
-
-                connection.on('close', function() {
-                    showStatus('game-status', 'המארח התנתק', 'error');
-                });
-            });
-
-            peer.on('error', function(err) {
-                showStatus('join-status', `שגיאה בחיבור: ${err.message}`, 'error');
-            });
-        }
-
-        function startGame() {
-            hideAllSections();
-            document.getElementById('game-play').classList.add('active');
-            
-            resetGame();
-            createKeyboard();
-            
-            if (isHost) {
-                document.getElementById('game-status').textContent = 'השחקן השני מנחש...';
-            } else {
-                document.getElementById('game-status').textContent = 'נחש את המילה!';
-                document.getElementById('guess-input').style.display = 'block';
-                document.getElementById('submit-guess').style.display = 'inline-block';
-                document.getElementById('guess-input').focus();
-            }
-        }
-
-        function resetGame() {
-            guessCount = 0;
-            gameEnded = false;
-            keyboardLetters.clear();
-            currentGuess = '';
-            
-            // Clear the grid
-            const grid = document.getElementById('word-grid');
-            grid.innerHTML = '';
-            
-            // Create 6 rows of 5 boxes each
-            for (let i = 0; i < maxGuesses; i++) {
-                const row = document.createElement('div');
-                row.className = 'word-row';
-                for (let j = 0; j < 5; j++) {
-                    const box = document.createElement('div');
-                    box.className = 'letter-box';
-                    row.appendChild(box);
-                }
-                grid.appendChild(row);
-            }
-
-            // Reset keyboard
-            createKeyboard();
-            
-            // Show/hide UI elements based on role
-            if (!isHost) {
-                document.getElementById('guess-input').style.display = 'block';
-                document.getElementById('submit-guess').style.display = 'inline-block';
-                document.getElementById('guess-input').value = '';
-                document.getElementById('guess-input').focus();
-            }
-            
-            document.getElementById('new-game-btn').style.display = 'none';
-        }
-
-        function createKeyboard() {
-            const keyboard = document.getElementById('keyboard');
-            keyboard.innerHTML = '';
-    
-            // Add backspace key
-            const backspaceKey = document.createElement('button');
-            backspaceKey.className = 'key';
-            backspaceKey.textContent = '←';
-            const handleBackspace = () => {
-                if (gameEnded || isHost) return;
-                const input = document.getElementById('guess-input');
-                input.value = input.value.slice(0, -1);
-                currentGuess = input.value;
-                input.focus();
-            };
-
-            backspaceKey.onclick = handleBackspace;
-            backspaceKey.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                handleBackspace();
-            }, { passive: false });
-            keyboard.appendChild(backspaceKey);
-
-            const handleEnter = () => {
-                if (!gameEnded && !isHost) {
-                    submitGuess();
-                }
-            };
-
-            enterKey.onclick = handleEnter;
-            enterKey.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                handleEnter();
-            }, { passive: false });
-    
-            // Add Hebrew letters
-            hebrewLetters.forEach(letter => {
-                const key = document.createElement('button');
-                key.className = 'key';
-                key.textContent = letter;
-                key.onclick = () => addLetter(letter);
-        
-                key.addEventListener('touchstart', function(e) {
-                    e.preventDefault();
-                    addLetter(letter);
-                }, { passive: false });
-
-                key.addEventListener('touchend', function(e) {
-                    e.preventDefault();
-                    }, { passive: false });
-        
-                keyboard.appendChild(key);
-            });
-    
-            // Add enter key
-            const enterKey = document.createElement('button');
-            enterKey.className = 'key';
-            enterKey.textContent = '↵';
-            enterKey.style.gridColumn = 'span 2';
-            enterKey.onclick = () => {
-                if (!gameEnded && !isHost) {
-                    submitGuess();
-                }
-            };
-            keyboard.appendChild(enterKey);
-        }
-
-        function addLetter(letter) {
-            if (gameEnded || isHost) return;
-    
-            const input = document.getElementById('guess-input');
-            if (input.value.length < 5) {
-                input.value += letter;
-                currentGuess = input.value;
-        
-                input.focus();
-        
-                // Auto-submit if 5 letters
-                if (input.value.length === 5) {
-                    setTimeout(submitGuess, 100);
-                }
-            }
-        }
-
-        function submitGuess() {
-            console.log('submitGuess called on mobile');
-            if (isHost || gameEnded) return;
-            
-            const guess = document.getElementById('guess-input').value.trim();
-            if (guess.length !== 5) {
-                showStatus('game-status', 'אנא הכנס מילה בת 5 אותיות', 'error');
-                return;
-            }
-
-            if (!/^[א-ת]+$/.test(guess)) {
-                showStatus('game-status', 'אנא השתמש רק באותיות עבריות', 'error');
-                return;
-            }
-
-            // Send guess to host
-            connection.send({
-                type: 'guess',
-                guess: guess
-            });
-
-            document.getElementById('guess-input').value = '';
-            currentGuess = '';
-        }
-
-        function handleGuess(guess) {
-            if (!isHost) return;
-
-            const result = checkGuess(guess, targetWord);
-            
-            // Send result back to guesser
-            connection.send({
-                type: 'result',
-                guess: guess,
-                result: result
-            });
-
-            // Display result for host
-            displayGuessResult(guess, result);
-
-            // Check win/lose conditions
-            if (guess === targetWord) {
-                connection.send({
-                    type: 'game-over',
-                    won: true,
-                    word: targetWord
-                });
-                endGame(true, targetWord);
-            } else if (guessCount >= maxGuesses) {
-                connection.send({
-                    type: 'game-over',
-                    won: false,
-                    word: targetWord
-                });
-                endGame(false, targetWord);
-            }
-        }
-
-        function checkGuess(guess, target) {
-            const result = [];
-            const targetArray = target.split('');
-            const guessArray = guess.split('');
-            
-            // First pass - exact matches
-            for (let i = 0; i < 5; i++) {
-                if (guessArray[i] === targetArray[i]) {
-                    result[i] = 'correct';
-                    targetArray[i] = null; // Mark as used
-                    guessArray[i] = null; // Mark as used
-                }
-            }
-            
-            // Second pass - partial matches
-            for (let i = 0; i < 5; i++) {
-                if (guessArray[i] !== null) {
-                    const index = targetArray.indexOf(guessArray[i]);
-                    if (index !== -1) {
-                        result[i] = 'partial';
-                        targetArray[index] = null; // Mark as used
-                    } else {
-                        result[i] = 'incorrect';
-                    }
-                }
-            }
-            
-            return result;
-        }
-
-        function displayGuessResult(guess, result) {
-            const rows = document.querySelectorAll('.word-row');
-            const currentRow = rows[guessCount];
-            const boxes = currentRow.querySelectorAll('.letter-box');
-            
-            for (let i = 0; i < 5; i++) {
-                boxes[i].textContent = guess[i];
-                boxes[i].className = `letter-box ${result[i]}`;
-                
-                // Update keyboard
-                updateKeyboard(guess[i], result[i]);
-            }
-            
-            guessCount++;
-        }
-
-        function updateKeyboard(letter, result) {
-            const keys = document.querySelectorAll('.key');
-            keys.forEach(key => {
-                if (key.textContent === letter) {
-                    // Only update if it's a better result
-                    if (!key.classList.contains('correct')) {
-                        if (result === 'correct' || (result === 'partial' && !key.classList.contains('partial'))) {
-                            key.className = `key ${result}`;
-                        } else if (result === 'incorrect' && !key.classList.contains('partial')) {
-                            key.className = `key ${result}`;
-                        }
-                    }
-                }
-            });
-        }
-
-        function endGame(won, word) {
-            gameEnded = true;
-            
-            if (!isHost) {
-                document.getElementById('guess-input').style.display = 'none';
-                document.getElementById('submit-guess').style.display = 'none';
-            }
-            
-            const status = document.getElementById('game-status');
-            if (won) {
-                if (isHost) {
-                    status.innerHTML = `השחקן השני ניצח! המילה הייתה: <strong>${word}</strong>`;
-                } else {
-                    status.innerHTML = `כל הכבוד! ניחשת נכון! המילה הייתה: <strong>${word}</strong>`;
-                }
-                status.className = 'status success';
-            } else {
-                status.innerHTML = `המשחק נגמר. המילה הייתה: <strong>${word}</strong>`;
-                status.className = 'status error';
-            }
-            
-            document.getElementById('new-game-btn').style.display = 'inline-block';
-        }
-
-        function newGame() {
-            if (isHost) {
-                // Ask for new word
-                hideAllSections();
-                document.getElementById('host-game').classList.add('active');
-                document.getElementById('word-input').value = '';
-                document.getElementById('host-status').innerHTML = '';
-                
-                // Notify the other player
-                if (connection) {
-                    connection.send({ type: 'new-game' });
-                }
-            } else {
-                // Wait for host to set new word
-                showStatus('game-status', 'מחכה למארח להגדיר מילה חדשה...', 'connection-info');
-            }
-        }
-
-        function showTokenDisplay(gameId) {
-            const statusDiv = document.getElementById('host-status');
-            statusDiv.innerHTML = `
-                <div class="connection-info">
-                    <div style="margin-bottom: 15px; font-weight: 600;">קוד המשחק שלך:</div>
-                    <div class="token-container">
-                        <div class="token-text">${gameId}</div>
-                        <button class="copy-button" onclick="copyToClipboard('${gameId}')">העתק</button>
-                    </div>
-                    <div style="margin-top: 15px;">מחכה לשחקן שני...</div>
-                </div>
-            `;
-        }
-
-        function showStatus(elementId, message, type, append = false) {
-            const element = document.getElementById(elementId);
-            const content = `<div class="${type}">${message}</div>`;
-            
-            if (append) {
-                element.innerHTML += content;
-            } else {
-                element.innerHTML = content;
-            }
-        }
-
-        // Add keyboard support
-        document.addEventListener('keydown', function(e) {
-            if (gameEnded || isHost) return;
-            if (e.target.tagName === 'INPUT') {
-            if (e.key === 'Enter') {
-            e.preventDefault();
-            submitGuess();
-        }
-        return;
-    }
-    
-    // Allow Ctrl+V 
-    if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
-        return; 
-    }
-    
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        submitGuess();
-    } else if (e.key === 'Backspace' || e.key === 'Delete') {
-        e.preventDefault();
-        const input = document.getElementById('guess-input');
-        if (e.key === 'Backspace') {
-            input.value = input.value.slice(0, -1);
-        } else if (e.key === 'Delete') {
-            input.value = input.value.slice(1);
-        }
-        currentGuess = input.value;
-    } else if (/^[א-ת]$/.test(e.key)) {
-        e.preventDefault();
-        addLetter(e.key);
-    }
-});
-
-        // HandlePasteEvents
-        document.getElementById('guess-input').addEventListener('paste', function(e) {
-            e.preventDefault(); 
-            
-            
-            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-            
-            
-            const cleanText = pastedText.replace(/[^א-ת]/g, '').substring(0, 5);
-            
-            
-            this.value = cleanText;
-            currentGuess = cleanText;
-        });
-
-        // Auto-submit when 5 letters are entered
-        document.getElementById('guess-input').addEventListener('input', function(e) {
-            // Update current guess but don't auto-submit to avoid conflicts
-            currentGuess = e.target.value;
-    
-            // Clean input - only Hebrew letters
-            const cleanValue = e.target.value.replace(/[^א-ת]/g, '').substring(0, 5);
-            if (cleanValue !== e.target.value) {
-                e.target.value = cleanValue;
-                currentGuess = cleanValue;
-            }
-            if (e.target.value.length === 5) {
-                setTimeout(() => {
-                    submitGuess();
-                }, 100);
-            }
-        });
-    </script>
-</body>
-</html>
+                        endGame(data.won, data.wor
